@@ -3,7 +3,9 @@
 package com.yahoo.vespa.zookeeper;
 
 import com.yahoo.cloud.config.ZookeeperServerConfig;
+import com.yahoo.security.tls.MixedMode;
 import com.yahoo.security.tls.TlsContext;
+import com.yahoo.security.tls.TransportSecurityUtils;
 import com.yahoo.vespa.defaults.Defaults;
 
 import java.io.FileWriter;
@@ -38,11 +40,14 @@ public class Configurator {
         System.setProperty("zookeeper.authProvider.x509", "com.yahoo.vespa.zookeeper.VespaMtlsAuthenticationProvider");
     }
 
-    void writeConfigToDisk(Optional<TlsContext> tlsContext) {
+    void writeConfigToDisk() { writeConfigToDisk(VespaTlsConfig.fromSystem()); }
+
+    // override of Vespa TLS config for unit testing
+    void writeConfigToDisk(VespaTlsConfig vespaTlsConfig) {
         configFilePath.toFile().getParentFile().mkdirs();
 
         try {
-            writeZooKeeperConfigFile(zookeeperServerConfig, tlsContext);
+            writeZooKeeperConfigFile(zookeeperServerConfig, vespaTlsConfig);
             writeMyIdFile(zookeeperServerConfig);
         } catch (IOException e) {
             throw new RuntimeException("Error writing zookeeper config", e);
@@ -50,13 +55,13 @@ public class Configurator {
     }
 
     private void writeZooKeeperConfigFile(ZookeeperServerConfig config,
-                                          Optional<TlsContext> tlsContext) throws IOException {
+                                          VespaTlsConfig vespaTlsConfig) throws IOException {
         try (FileWriter writer = new FileWriter(configFilePath.toFile())) {
-            writer.write(transformConfigToString(config, tlsContext));
+            writer.write(transformConfigToString(config, vespaTlsConfig));
         }
     }
 
-    private String transformConfigToString(ZookeeperServerConfig config, Optional<TlsContext> tlsContext) {
+    private String transformConfigToString(ZookeeperServerConfig config, VespaTlsConfig vespaTlsConfig) {
         StringBuilder sb = new StringBuilder();
         sb.append("tickTime=").append(config.tickTime()).append("\n");
         sb.append("initLimit=").append(config.initLimit()).append("\n");
@@ -79,8 +84,8 @@ public class Configurator {
         sb.append("metricsProvider.className=org.apache.zookeeper.metrics.impl.NullMetricsProvider\n");
         ensureThisServerIsRepresented(config.myid(), config.server());
         config.server().forEach(server -> addServerToCfg(sb, server));
-        sb.append(new TlsQuorumConfig().createConfig(config, tlsContext));
-        sb.append(new TlsClientServerConfig().createConfig(config, tlsContext));
+        sb.append(new TlsQuorumConfig().createConfig(vespaTlsConfig));
+        sb.append(new TlsClientServerConfig().createConfig(config, vespaTlsConfig));
         return sb.toString();
     }
 
@@ -140,22 +145,10 @@ public class Configurator {
     }
 
     private interface TlsConfig {
-        String createConfig(ZookeeperServerConfig config, Optional<TlsContext> tlsContext);
-
-        default Optional<String> getEnvironmentVariable(String variableName) {
-            return Optional.ofNullable(System.getenv().get(variableName))
-                    .filter(var -> !var.isEmpty());
-        }
-
-        default void validateOptions(Optional<TlsContext> tlsContext, String tlsSetting) {
-            if (tlsContext.isEmpty() && !tlsSetting.equals("OFF"))
-                throw new RuntimeException("Could not retrieve transport security options");
-        }
-
         String configFieldPrefix();
 
-        default void appendSharedTlsConfig(StringBuilder builder, Optional<TlsContext> tlsContext) {
-            tlsContext.ifPresent(ctx -> {
+        default void appendSharedTlsConfig(StringBuilder builder, VespaTlsConfig vespaTlsConfig) {
+            vespaTlsConfig.context().ifPresent(ctx -> {
                 builder.append(configFieldPrefix()).append(".context.supplier.class=").append(VespaSslContextProvider.class.getName()).append("\n");
                 String enabledCiphers = Arrays.stream(ctx.parameters().getCipherSuites()).sorted().collect(Collectors.joining(","));
                 builder.append(configFieldPrefix()).append(".ciphersuites=").append(enabledCiphers).append("\n");
@@ -164,41 +157,25 @@ public class Configurator {
                 builder.append(configFieldPrefix()).append(".clientAuth=NEED\n");
             });
         }
+
+        default boolean enablePortUnification(VespaTlsConfig config) {
+            return config.tlsEnabled()
+                    && (config.mixedMode() == MixedMode.TLS_CLIENT_MIXED_SERVER || config.mixedMode() == MixedMode.PLAINTEXT_CLIENT_MIXED_SERVER);
+        }
     }
 
     static class TlsClientServerConfig implements TlsConfig {
 
-        @Override
-        public String createConfig(ZookeeperServerConfig config, Optional<TlsContext> tlsContext) {
-            String tlsSetting = getEnvironmentVariable("VESPA_TLS_FOR_ZOOKEEPER_CLIENT_SERVER_COMMUNICATION")
-                    .orElse(config.tlsForClientServerCommunication().name());
-            validateOptions(tlsContext, tlsSetting);
-
-            StringBuilder sb = new StringBuilder();
-            boolean portUnification;
-            boolean secureClientPort;
-            switch (tlsSetting) {
-                case "OFF":
-                    secureClientPort = false; portUnification = false;
-                    break;
-                case "TLS_ONLY":
-                    secureClientPort = true; portUnification = false;
-                    break;
-                case "PORT_UNIFICATION":
-                case "TLS_WITH_PORT_UNIFICATION":
-                    secureClientPort = false; portUnification = true;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown value of config setting tlsForClientServerCommunication: " + tlsSetting);
-            }
+        public String createConfig(ZookeeperServerConfig config, VespaTlsConfig vespaTlsConfig) {
             // ZooKeeper Dynamic Reconfiguration does not support SSL/secure client port
             // The secure client port must be configured in the static configuration section instead
             // https://issues.apache.org/jira/browse/ZOOKEEPER-3577
-            sb.append("client.portUnification=").append(portUnification).append("\n")
+            boolean secureClientPort = vespaTlsConfig.tlsEnabled() && vespaTlsConfig.mixedMode() == MixedMode.DISABLED;
+            StringBuilder sb = new StringBuilder()
+                    .append("client.portUnification=").append(enablePortUnification(vespaTlsConfig)).append("\n")
                     .append("clientPort=").append(secureClientPort ? 0 : config.clientPort()).append("\n")
                     .append("secureClientPort=").append(secureClientPort ? config.clientPort() : 0).append("\n");
-            appendSharedTlsConfig(sb, tlsContext);
-
+            appendSharedTlsConfig(sb, vespaTlsConfig);
             return sb.toString();
         }
 
@@ -210,38 +187,11 @@ public class Configurator {
 
     static class TlsQuorumConfig implements TlsConfig {
 
-        @Override
-        public String createConfig(ZookeeperServerConfig config, Optional<TlsContext> tlsContext) {
-            String tlsSetting = getEnvironmentVariable("VESPA_TLS_FOR_ZOOKEEPER_QUORUM_COMMUNICATION")
-                    .orElse(config.tlsForQuorumCommunication().name());
-            validateOptions(tlsContext, tlsSetting);
-
-            StringBuilder sb = new StringBuilder();
-            boolean sslQuorum;
-            boolean portUnification;
-            switch (tlsSetting) {
-                case "OFF":
-                    sslQuorum = false;
-                    portUnification = false;
-                    break;
-                case "PORT_UNIFICATION":
-                    sslQuorum = false;
-                    portUnification = true;
-                    break;
-                case "TLS_WITH_PORT_UNIFICATION":
-                    sslQuorum = true;
-                    portUnification = true;
-                    break;
-                case "TLS_ONLY":
-                    sslQuorum = true;
-                    portUnification = false;
-                    break;
-                default: throw new IllegalArgumentException("Unknown value of config setting tlsForQuorumCommunication: " + tlsSetting);
-            }
-            sb.append("sslQuorum=").append(sslQuorum).append("\n");
-            sb.append("portUnification=").append(portUnification).append("\n");
-            appendSharedTlsConfig(sb, tlsContext);
-
+        public String createConfig(VespaTlsConfig vespaTlsConfig) {
+            StringBuilder sb = new StringBuilder()
+                    .append("sslQuorum=").append(vespaTlsConfig.tlsEnabled()).append("\n")
+                    .append("portUnification=").append(enablePortUnification(vespaTlsConfig)).append("\n");
+            appendSharedTlsConfig(sb, vespaTlsConfig);
             return sb.toString();
         }
 
@@ -249,6 +199,28 @@ public class Configurator {
         public String configFieldPrefix() {
             return "ssl.quorum";
         }
+    }
+
+    static class VespaTlsConfig {
+        private final TlsContext context;
+        private final MixedMode mixedMode;
+
+        VespaTlsConfig(TlsContext context, MixedMode mixedMode) {
+            this.context = context;
+            this.mixedMode = mixedMode;
+        }
+
+        static VespaTlsConfig fromSystem() {
+            return new VespaTlsConfig(
+                    TransportSecurityUtils.getSystemTlsContext().orElse(null),
+                    TransportSecurityUtils.getInsecureMixedMode());
+        }
+
+        static VespaTlsConfig tlsDisabled() { return new VespaTlsConfig(null, MixedMode.defaultValue()); }
+
+        boolean tlsEnabled() { return context != null; }
+        Optional<TlsContext> context() { return Optional.ofNullable(context); }
+        MixedMode mixedMode() { return mixedMode; }
     }
 
 }
