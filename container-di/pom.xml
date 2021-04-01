@@ -18,6 +18,12 @@
 
     <!-- COMPILE scope -->
     <dependency>
+      <!-- Needed by guava, which has an optional dependency on jsr305.
+      Not optional here, to avoid the need to add it to a lot of dependent modules. -->
+      <groupId>com.google.code.findbugs</groupId>
+      <artifactId>jsr305</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.yahoo.vespa</groupId>
       <artifactId>annotations</artifactId>
       <version>${project.version}</version>
@@ -35,6 +41,11 @@
     </dependency>
 
     <!-- PROVIDED scope -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <scope>provided</scope>
+    </dependency>
     <dependency>
       <groupId>com.google.inject</groupId>
       <artifactId>guice</artifactId>
@@ -56,6 +67,12 @@
     <dependency>
       <groupId>com.yahoo.vespa</groupId>
       <artifactId>config-bundle</artifactId>
+      <version>${project.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.yahoo.vespa</groupId>
+      <artifactId>config-lib</artifactId>
       <version>${project.version}</version>
       <scope>provided</scope>
     </dependency>
