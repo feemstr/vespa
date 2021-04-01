@@ -137,6 +137,30 @@
           </executions>
         </plugin>
         <plugin>
+          <groupId>org.codehaus.mojo</groupId>
+          <artifactId>exec-maven-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>generate-vtag</id>
+              <phase>compile</phase>
+              <goals>
+                <goal>java</goal>
+              </goals>
+              <configuration>
+                <mainClass>com.yahoo.vespa.VersionTagger</mainClass>
+                <arguments>
+                  <argument>${project.basedir}/../dist/vtag.map</argument>
+                  <argument>com.yahoo.component</argument>
+                  <argument>${project.build.directory}/generated-sources/vtag</argument>
+                  <argument>vtag</argument>
+                </arguments>
+                <sourceRoot>${project.build.directory}/generated-sources/vtag</sourceRoot>
+                <classpathScope>compile</classpathScope>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-javadoc-plugin</artifactId>
         </plugin>
@@ -154,6 +178,15 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
+          <executions>
+            <execution>
+              <id>compile-vtag</id>
+              <phase>compile</phase>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+            </execution>
+          </executions>
         </plugin>
       </plugins>
   </build>
