@@ -345,7 +345,7 @@
                             <failOnError>${javadoc.failOnError}</failOnError>
                             <quiet>true</quiet>
                             <show>protected</show>
-                            <header>&lt;a href="https://docs.vespa.ai"&gt;&lt;img src="https://docs.vespa.ai/img/vespa-logo.png" width="100" height="28" style="padding-top:7px"/&gt;&lt;/a&gt;</header>
+                            <header>&lt;a href="https://docs.vespa.ai">&lt;img src="https://docs.vespa.ai/img/vespa-logo.png" width="100" height="28" style="padding-top:7px"/>&lt;/a></header>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -410,7 +410,7 @@
             <dependency>
                 <groupId>com.auth0</groupId>
                 <artifactId>java-jwt</artifactId>
-                <version>3.10.0</version>
+                <version>3.10.1</version>
             </dependency>
             <dependency>
                 <groupId>com.github.cverges.expect4j</groupId>
