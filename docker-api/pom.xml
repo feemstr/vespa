@@ -36,7 +36,7 @@
         <dependency>
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java</artifactId>
-            <version>3.1.2</version>
+            <version>3.2.0</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -108,7 +108,7 @@
              <!-- We explicitly specify the version of httpclient to be used by
             docker-java so the dependency is declared closer to the root of maven and
             more likely be the version that is finally being used. -->
-            <version>4.5</version>
+            <version>4.5.13</version>
             <scope>compile</scope>
         </dependency>
 
