@@ -345,7 +345,7 @@
                             <failOnError>${javadoc.failOnError}</failOnError>
                             <quiet>true</quiet>
                             <show>protected</show>
-                            <header>&lt;a href="https://docs.vespa.ai"&gt;&lt;img src="https://docs.vespa.ai/img/vespa-logo.png" width="100" height="28" style="padding-top:7px"/&gt;&lt;/a&gt;</header>
+                            <header>&lt;a href="https://docs.vespa.ai">&lt;img src="https://docs.vespa.ai/img/vespa-logo.png" width="100" height="28" style="padding-top:7px"/>&lt;/a></header>
                         </configuration>
                     </plugin>
                 </plugins>
@@ -781,7 +781,7 @@
         <!-- Athenz dependencies. Make sure these dependencies match those in Vespa's internal repositories -->
         <athenz.version>1.10.11</athenz.version>
         <jjwt.version>0.11.2</jjwt.version>
-        <aws.sdk.version>1.11.974</aws.sdk.version>
+        <aws.sdk.version>1.12.376</aws.sdk.version>
         <!-- WARNING: If you change curator version, you also need to update
                  zkfacade/src/main/java/org/apache/curator/**/package-info.java
              using something like
