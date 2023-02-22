@@ -781,7 +781,7 @@
         <!-- Athenz dependencies. Make sure these dependencies match those in Vespa's internal repositories -->
         <athenz.version>1.10.11</athenz.version>
         <jjwt.version>0.11.2</jjwt.version>
-        <aws.sdk.version>1.11.974</aws.sdk.version>
+        <aws.sdk.version>1.12.412</aws.sdk.version>
         <!-- WARNING: If you change curator version, you also need to update
                  zkfacade/src/main/java/org/apache/curator/**/package-info.java
              using something like
